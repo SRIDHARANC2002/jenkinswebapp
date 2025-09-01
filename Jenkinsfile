@@ -9,7 +9,6 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                // Always pull latest changes from GitHub
                 git branch: 'main', url: 'https://github.com/pradeeprpin/jenkinswebapp.git'
             }
         }
@@ -17,7 +16,8 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    sh "docker build -t ${DOCKER_IMAGE}:latest ."
+                    // Force fresh build with no cache
+                    sh "docker build --no-cache -t ${DOCKER_IMAGE}:latest ."
                 }
             }
         }
@@ -41,8 +41,10 @@ pipeline {
         stage('Deploy Container') {
             steps {
                 script {
+                    // Remove old container, pull latest image, and redeploy
                     sh """
                     docker rm -f ${CONTAINER_NAME} || true
+                    docker pull ${DOCKER_IMAGE}:latest
                     docker run -d --name ${CONTAINER_NAME} -p 80:80 ${DOCKER_IMAGE}:latest
                     """
                 }
@@ -50,8 +52,7 @@ pipeline {
         }
     }
 
-    // This will pull new code when you push to GitHub (webhook needed)
     triggers {
-        pollSCM('* * * * *')   // Check every 1 minute
+        pollSCM('* * * * *')   // Check every 1 minute for changes
     }
 }

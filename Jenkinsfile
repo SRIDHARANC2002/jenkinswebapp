@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = "sri1812/simple-webapp"   // Docker Hub repo
+        DOCKER_IMAGE = "sri1812/simple-webapp"   // Replace with your Docker Hub repo
         CONTAINER_NAME = "webapp-container"
     }
 
@@ -16,15 +16,26 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    sh "docker build -t ${DOCKER_IMAGE}:latest ."
+                    sh """
+                        echo "Building Docker Image..."
+                        docker build -t ${DOCKER_IMAGE}:latest .
+                    """
                 }
             }
         }
 
         stage('Login to Docker Hub') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                script {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'dockerhub',   // Jenkins Credentials ID
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh """
+                            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        """
+                    }
                 }
             }
         }
@@ -32,7 +43,10 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
-                    sh "docker push ${DOCKER_IMAGE}:latest"
+                    sh """
+                        echo "Pushing Docker Image to Docker Hub..."
+                        docker push ${DOCKER_IMAGE}:latest
+                    """
                 }
             }
         }
@@ -41,11 +55,21 @@ pipeline {
             steps {
                 script {
                     sh """
-                    docker rm -f ${CONTAINER_NAME} || true
-                    docker run -d --name ${CONTAINER_NAME} -p 80:80 ${DOCKER_IMAGE}:latest
+                        echo "Deploying Container..."
+                        docker rm -f ${CONTAINER_NAME} || true
+                        docker run -d --name ${CONTAINER_NAME} -p 80:80 ${DOCKER_IMAGE}:latest
                     """
                 }
             }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline Finished ✅'
+        }
+        failure {
+            echo 'Pipeline Failed ❌'
         }
     }
 }

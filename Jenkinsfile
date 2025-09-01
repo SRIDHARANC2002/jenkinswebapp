@@ -2,13 +2,14 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = "sri1812/simple-webapp"   // Replace with your Docker Hub repo
+        DOCKER_IMAGE = "sri1812/simple-webapp"   // Docker Hub repo
         CONTAINER_NAME = "webapp-container"
     }
 
     stages {
         stage('Checkout Code') {
             steps {
+                // Always pull latest changes from GitHub
                 git branch: 'main', url: 'https://github.com/pradeeprpin/jenkinswebapp.git'
             }
         }
@@ -16,26 +17,15 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    sh """
-                        echo "Building Docker Image..."
-                        docker build -t ${DOCKER_IMAGE}:latest .
-                    """
+                    sh "docker build -t ${DOCKER_IMAGE}:latest ."
                 }
             }
         }
 
         stage('Login to Docker Hub') {
             steps {
-                script {
-                    withCredentials([usernamePassword(
-                        credentialsId: 'dockerhub',   // Jenkins Credentials ID
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )]) {
-                        sh """
-                            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-                        """
-                    }
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                 }
             }
         }
@@ -43,10 +33,7 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
-                    sh """
-                        echo "Pushing Docker Image to Docker Hub..."
-                        docker push ${DOCKER_IMAGE}:latest
-                    """
+                    sh "docker push ${DOCKER_IMAGE}:latest"
                 }
             }
         }
@@ -55,21 +42,16 @@ pipeline {
             steps {
                 script {
                     sh """
-                        echo "Deploying Container..."
-                        docker rm -f ${CONTAINER_NAME} || true
-                        docker run -d --name ${CONTAINER_NAME} -p 80:80 ${DOCKER_IMAGE}:latest
+                    docker rm -f ${CONTAINER_NAME} || true
+                    docker run -d --name ${CONTAINER_NAME} -p 80:80 ${DOCKER_IMAGE}:latest
                     """
                 }
             }
         }
     }
 
-    post {
-        always {
-            echo 'Pipeline Finished ✅'
-        }
-        failure {
-            echo 'Pipeline Failed ❌'
-        }
+    // This will pull new code when you push to GitHub (webhook needed)
+    triggers {
+        pollSCM('* * * * *')   // Check every 1 minute
     }
 }
